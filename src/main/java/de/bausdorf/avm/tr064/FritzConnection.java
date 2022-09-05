@@ -26,21 +26,20 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.protocol.HttpContext;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.auth.AuthScope;
+import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.protocol.HttpClientContext;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.protocol.HttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,8 +91,8 @@ public class FritzConnection {
 		if (user != null && pwd != null) {
 			LOG.debug("try to connect to " + this.targetHost.getAddress() + " with credentials " + this.user + "/"
 					+ this.pwd);
-			CredentialsProvider credsProvider = new BasicCredentialsProvider();
-			credsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(user, pwd));
+			BasicCredentialsProvider credsProvider = new BasicCredentialsProvider();
+			credsProvider.setCredentials(new AuthScope(null, -1), new UsernamePasswordCredentials(user, pwd.toCharArray()));
 			context.setCredentialsProvider(credsProvider);
 			readTR64(scpdUrl);
 		} else {
@@ -145,16 +144,16 @@ public class FritzConnection {
 			}
 	}
 
-	private InputStream httpRequest(HttpHost target, HttpRequest request, HttpContext context) throws IOException {
+	private InputStream httpRequest(HttpHost target, ClassicHttpRequest request, HttpContext context) throws IOException {
 		byte[] content = null;
-		LOG.debug("try to request " + request.getRequestLine() + " from " + target.toURI());
+		LOG.debug("try to request " + request.getRequestUri() + " from " + target.toURI());
 		try (CloseableHttpResponse response = httpClient.execute(target, request, context)) {
-			LOG.debug("got response " + response.getStatusLine());
+			LOG.debug("got response " + response.getCode());
 			content = EntityUtils.toByteArray(response.getEntity());
 			EntityUtils.consume(response.getEntity());
 			LOG.debug("got content: " + new String(content));
-			if (response.getStatusLine().getStatusCode() != 200) {
-				throw new IOException(response.getStatusLine().toString());
+			if (response.getCode() != 200) {
+				throw new IOException("Request failed: " + response.getCode());
 			}
 
 			if (content != null) {
